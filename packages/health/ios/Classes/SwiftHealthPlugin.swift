@@ -195,24 +195,138 @@ public class SwiftHealthPlugin: NSObject, FlutterPlugin {
         
         print("Successfully called writeData with value of \(value) and type of \(type)")
         
-        let sample: HKObject
-      
-        if (unitLookUp(key: type) == HKUnit.init(from: "")) {
-          sample = HKCategorySample(type: dataTypeLookUp(key: type) as! HKCategoryType, value: Int(value), start: dateFrom, end: dateTo)
-        } else {
-          let quantity = HKQuantity(unit: unitLookUp(key: type), doubleValue: value)
-          
-          sample = HKQuantitySample(type: dataTypeLookUp(key: type) as! HKQuantityType, quantity: quantity, start: dateFrom, end: dateTo)
+        if(type == WORKOUT) {
+            if #available(iOS 10.0, *) {
+//                let workout = HKWorkout(activityType: .highIntensityIntervalTraining, start: dateFrom, end: dateTo)
+                
+                let metadata: [String: Bool] = [
+                    HKMetadataKeyGroupFitness: false,
+//                    HKMetadataKeyIndoorWorkout: true,
+                    HKMetadataKeyCoachedWorkout: true
+                ]
+                
+                var workout = HKWorkout(
+                    activityType: .highIntensityIntervalTraining,
+                    start: dateFrom,
+                    end: dateTo,
+                    workoutEvents: nil,
+                    totalEnergyBurned: nil,
+                    totalDistance: nil,
+                    device: nil,
+                    metadata: metadata
+                )
+                
+                if(value > 0) {
+                    let calorieQuantity = HKQuantity(unit: .kilocalorie(), doubleValue: value)
+                    workout = HKWorkout(
+                        activityType: .highIntensityIntervalTraining,
+                        start: dateFrom,
+                        end: dateTo,
+                        workoutEvents: nil,
+                        totalEnergyBurned: calorieQuantity,
+                        totalDistance: nil,
+                        device: nil,
+                        metadata: metadata
+                    )
+                }
+                
+                let healthStore = HKHealthStore()
+                healthStore.save(workout) { (success: Bool, error: Error?) -> Void in
+                    if success {
+                        // Workout was successfully saved
+                        print("Successfully saved WORKOUT with value of \(value)")
+                    }
+                    else {
+                        // Workout was not successfully saved
+                        if let err = error {
+                          print("Error Saving WORKOUT Sample - builder.add : \(err.localizedDescription)")
+                        }
+                    }
+                    DispatchQueue.main.async {
+                        result(success)
+                    }
+                }
+                
+            }
+            
+//            if #available(iOS 12.0, *) {
+//                let healthStore = HKHealthStore()
+//                let workoutConfiguration = HKWorkoutConfiguration()
+//
+//                workoutConfiguration.activityType = .coreTraining
+//                let builder = HKWorkoutBuilder(healthStore: healthStore,
+//                                               configuration: workoutConfiguration,
+//                                               device: .local())
+//
+//                builder.beginCollection(withStart: dateFrom) { (success, error) in
+//                  guard success else {
+//                      if let err = error {
+//                          print("Error Saving WORKOUT Sample - beginCollection : \(err.localizedDescription)")
+//                      }
+//                    return
+//                  }
+//                }
+//
+//                guard let energyQuantityType = HKSampleType.quantityType(
+//                  forIdentifier: .activeEnergyBurned) else {
+//                      fatalError("*** Energy Burned Type Not Available ***")
+//                }
+//                let sample: HKSample
+//                let calorieQuantity = HKQuantity(unit: .kilocalorie(),
+//                                                 doubleValue: value)
+//                sample = HKCumulativeQuantitySeriesSample(type: energyQuantityType,
+//                                                          quantity: calorieQuantity,
+//                                                          start: dateFrom,
+//                                                          end: dateTo)
+//
+//                builder.add([sample]) { (success, error) in
+//                  guard success else {
+//                      if let err = error {
+//                          print("Error Saving WORKOUT Sample - builder.add : \(err.localizedDescription)")
+//                      }
+//                    return
+//                  }
+//
+//                  builder.endCollection(withEnd: dateTo) { (success, error) in
+//                    guard success else {
+//                        if let err = error {
+//                            print("Error Saving WORKOUT Sample - builder.endCollection : \(err.localizedDescription)")
+//                        }
+//                      return
+//                    }
+//
+//                    builder.finishWorkout { (workout, error) in
+//                      let success = error == nil
+//                        if(success) {
+//                            print("Successfully saved WORKOUT with value of \(value)")
+//                        }
+//                        DispatchQueue.main.async {
+//                            result(success)
+//                        }
+//                    }
+//                  }
+//                }
+//            }
         }
-        
-        HKHealthStore().save(sample, withCompletion: { (success, error) in
-            if let err = error {
-                print("Error Saving \(type) Sample: \(err.localizedDescription)")
+        else {
+            let sample: HKObject
+            
+            if (unitLookUp(key: type) == HKUnit.init(from: "")) {
+                sample = HKCategorySample(type: dataTypeLookUp(key: type) as! HKCategoryType, value: Int(value), start: dateFrom, end: dateTo)
+            } else {
+              let quantity = HKQuantity(unit: unitLookUp(key: type), doubleValue: value)
+              sample = HKQuantitySample(type: dataTypeLookUp(key: type) as! HKQuantityType, quantity: quantity, start: dateFrom, end: dateTo)
             }
-            DispatchQueue.main.async {
-                result(success)
-            }
-        })
+            
+            HKHealthStore().save(sample, withCompletion: { (success, error) in
+                if let err = error {
+                    print("Error Saving \(type) Sample: \(err.localizedDescription)")
+                }
+                DispatchQueue.main.async {
+                    result(success)
+                }
+            })
+        }
     }
 
     func getData(call: FlutterMethodCall, result: @escaping FlutterResult) {
